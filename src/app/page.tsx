@@ -1,101 +1,299 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState, useCallback, useEffect } from 'react'
+import { Upload, Search, SlidersHorizontal, AlertCircle } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+
+export default function Component() {
+  const [data, setData] = useState<any[]>([])
+  const [columns, setColumns] = useState<string[]>([])
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [error, setError] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+
+  const handleFileUpload = useCallback(async (file: File) => {
+    setError(null)
+    try {
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        let parsedData: any[] = []
+
+        if (file.name.endsWith('.csv')) {
+          const text = e.target?.result as string
+          parsedData = text.split('\n').map(row => {
+            const values = row.split(',')
+            return columns.reduce((obj, col, index) => {
+              obj[col] = values[index]
+              return obj
+            }, {} as Record<string, string>)
+          })
+        } else if (file.name.endsWith('.json')) {
+          const text = e.target?.result as string
+          parsedData = JSON.parse(text)
+        } else if (file.name.endsWith('.ndjson')) {
+          const text = e.target?.result as string
+          parsedData = text.split('\n')
+            .filter(line => line.trim())
+            .map(line => JSON.parse(line))
+        }
+
+        if (parsedData.length === 0) {
+          throw new Error('The file is empty or contains no valid data.')
+        }
+
+        // Extract columns from the first row/object
+        const cols = parsedData.length > 0 ? Object.keys(parsedData[0]) : []
+        setColumns(cols)
+        setVisibleColumns(cols)
+        setData(parsedData)
+      }
+
+      reader.onerror = () => {
+        throw new Error('Error reading file.')
+      }
+
+      if (file.name.endsWith('.json') || file.name.endsWith('.ndjson') || file.name.endsWith('.csv')) {
+        reader.readAsText(file)
+      } else {
+        throw new Error('Unsupported file format. Please upload a CSV, JSON, or NDJSON file.')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred.')
+    }
+  }, [columns])
+
+  const filteredData = data.filter(row =>
+    Object.values(row).some(value =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  )
+
+  const paginatedData = filteredData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
+
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage)
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) {
+      handleFileUpload(file)
+    }
+  }, [handleFileUpload])
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const pastedText = e.clipboardData?.getData('text')
+      if (pastedText) {
+        try {
+          const parsedData = JSON.parse(pastedText)
+          if (Array.isArray(parsedData)) {
+            setData(parsedData)
+            const cols = parsedData.length > 0 ? Object.keys(parsedData[0]) : []
+            setColumns(cols)
+            setVisibleColumns(cols)
+          } else {
+            throw new Error('Pasted data is not a valid JSON array.')
+          }
+        } catch (err) {
+          setError('Failed to parse pasted data. Please ensure it\'s a valid JSON array.')
+        }
+      }
+    }
+
+    document.addEventListener('paste', handlePaste)
+    return () => {
+      document.removeEventListener('paste', handlePaste)
+    }
+  }, [])
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+    <div className="max-w-max mx-auto p-2 sm:p-4 md:p-6 min-h-screen flex items-center justify-center">
+      <Card className={`backdrop-blur-sm bg-white/30 dark:bg-gray-800/30 shadow-xl w-full ${data.length > 0 ? 'h-[calc(100vh-2rem)]' : ''}`}>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold">Data Viewer</CardTitle>
+          <CardDescription>
+            View your data files, big or small, in an easy to use table.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className={`${data.length > 0 ? 'h-[calc(100%-7rem)] flex flex-col p-4 pb-4' : 'space-y-4'}`}>
+          {data.length === 0 ? (
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragging ? 'border-primary bg-primary/10' : 'border-muted hover:bg-muted/50'
+                }`}
+            >
+              <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-full cursor-pointer">
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <Upload className="w-10 h-10 mb-3 text-muted-foreground" />
+                  <p className="mb-2 text-sm text-muted-foreground">
+                    <span className="font-semibold">Click to upload</span> or drag and drop
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    CSV, JSON, NDJSON supported
+                  </p>
+                </div>
+                <input
+                  id="file-upload"
+                  type="file"
+                  className="hidden"
+                  accept=".csv,.json,.ndjson"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) handleFileUpload(file)
+                  }}
+                />
+              </label>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2 mb-4">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Search in all columns..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <SlidersHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    {columns.map((column) => (
+                      <DropdownMenuCheckboxItem
+                        key={column}
+                        checked={visibleColumns.includes(column)}
+                        onCheckedChange={(checked) => {
+                          setVisibleColumns(
+                            checked
+                              ? [...visibleColumns, column]
+                              : visibleColumns.filter((col) => col !== column)
+                          )
+                        }}
+                      >
+                        {column}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <div className="flex-1 overflow-auto border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {visibleColumns.map((column) => (
+                        <TableHead key={column}>{column}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedData.map((row, rowIndex) => (
+                      <TableRow key={rowIndex}>
+                        {visibleColumns.map((column) => (
+                          <TableCell key={column}>{String(row[column])}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex items-center justify-between pt-2"> {/* Update: Adjusted pagination container margins */}
+                <Select
+                  value={String(itemsPerPage)}
+                  onValueChange={(value) => setItemsPerPage(Number(value))}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Rows per page" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10 per page</SelectItem>
+                    <SelectItem value="25">25 per page</SelectItem>
+                    <SelectItem value="50">50 per page</SelectItem>
+                    <SelectItem value="100">100 per page</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <div className="text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
     </div>
-  );
+  )
 }
