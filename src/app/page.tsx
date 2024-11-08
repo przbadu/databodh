@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { Upload, Search, SlidersHorizontal, AlertCircle } from 'lucide-react'
+import { Upload, SlidersHorizontal, AlertCircle } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -37,7 +37,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 
 export default function Component() {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [columns, setColumns] = useState<string[]>([])
   const [visibleColumns, setVisibleColumns] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -48,7 +48,7 @@ export default function Component() {
   const [isJsonData, setIsJsonData] = useState(false)
   const [flattenJson, setFlattenJson] = useState(false)
 
-  const flattenObject = (obj: Record<string, unknown>, parentKey = '', result: Record<string, unknown> = {}): Record<string, unknown> => {
+  const flattenObject = useCallback((obj: Record<string, unknown>, parentKey = '', result: Record<string, unknown> = {}): Record<string, unknown> => {
     for (const key in obj) {
       const newKey = parentKey ? `${parentKey}.${key}` : key;
       if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
@@ -60,14 +60,14 @@ export default function Component() {
       }
     }
     return result;
-  };
+  }, []);
 
   const handleFileUpload = useCallback(async (file: File) => {
     setError(null)
     try {
       const reader = new FileReader()
       reader.onload = async (e) => {
-        let parsedData: any[] = []
+        let parsedData: Record<string, unknown>[] = []
 
         if (file.name.endsWith('.csv')) {
           const text = e.target?.result as string
@@ -112,7 +112,7 @@ export default function Component() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.')
     }
-  }, [columns, flattenJson])
+  }, [columns, flattenJson, flattenObject])
 
   const filteredData = data.filter(row =>
     Object.values(row).some(value =>
@@ -161,7 +161,7 @@ export default function Component() {
           } else {
             throw new Error('Pasted data is not a valid JSON array.')
           }
-        } catch (err) {
+        } catch {
           setError('Failed to parse pasted data. Please ensure it\'s a valid JSON array.')
         }
       }
@@ -171,7 +171,7 @@ export default function Component() {
     return () => {
       document.removeEventListener('paste', handlePaste)
     }
-  }, [flattenJson])
+  }, [flattenJson, flattenObject])
 
   useEffect(() => {
     if (isJsonData && data.length > 0) {
@@ -181,7 +181,7 @@ export default function Component() {
       setColumns(newColumns)
       setVisibleColumns(newColumns)
     }
-  }, [flattenJson, isJsonData])
+  }, [flattenJson, isJsonData, flattenObject])
 
   return (
     <div className="max-w-max mx-auto p-2 sm:p-4 md:p-6 min-h-screen flex items-center justify-center">
