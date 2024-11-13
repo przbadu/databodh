@@ -313,6 +313,9 @@ export default function Component() {
                   </SelectContent>
                 </Select>
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+                    <div className="text-sm text-muted-foreground mr-8">
+                      Total Records: {data.length}
+                    </div>
                   <Button
                     variant="outline"
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
